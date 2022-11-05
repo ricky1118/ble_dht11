@@ -3,8 +3,8 @@
 # project subdirectory.
 #
 
-PROJECT_NAME := dht11
+PROJECT_NAME := ble_dht11
 
 EXTRA_COMPONENT_DIRS = $(IDF_PATH)/examples/common_components/led_strip
-
+COMPONENT_ADD_INCLUDEDIRS := components/include
 include $(IDF_PATH)/make/project.mk
