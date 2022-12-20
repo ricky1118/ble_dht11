@@ -36,21 +36,30 @@
 #define GATTS_TAG "GATTS_DEMO"
 static const char *TAG = "DHT11_test";
 /***************************************************************************************************************************************/
-///Declare the static function
+///Declare the static function  （esp_gatts_api.h文档中有说明）
+/**GATT回调函数gatts_profile_a_event_handler     gatts_profile_b_event_handler
+ * 
+ * 参数：
+ * 1、event 枚举类型，GATT Server callback function events GATT服务回调功能事件  
+ * 2、gatts_if  8位数字类型  （esp_gatt_defs.h 头文件中定义）
+ *              Gatt interface type  GATT接口类型, different application on GATT client use different gatt_if 不同的应用在GATT服务上使用不同的gatt_if
+ * 3、*param   联合体指针  这个包含了每一种event情况下，数据结构体的总和。定义在esp_gatts_api.h中。  
+ *             Point to callback parameter, currently is union type
+ * */                     
 static void gatts_profile_a_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_if, esp_ble_gatts_cb_param_t *param);
 static void gatts_profile_b_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_if, esp_ble_gatts_cb_param_t *param);
 
-#define GATTS_SERVICE_UUID_TEST_A   0x00FF
-#define GATTS_CHAR_UUID_TEST_A      0xFF01
-#define GATTS_DESCR_UUID_TEST_A     0x3333
-#define GATTS_NUM_HANDLE_TEST_A     4
+#define GATTS_SERVICE_UUID_TEST_A   0x00FF//服务句柄
+#define GATTS_CHAR_UUID_TEST_A      0xFF01//特征句柄
+#define GATTS_DESCR_UUID_TEST_A     0x3333//特征描述符句柄
+#define GATTS_NUM_HANDLE_TEST_A     4 //A的句柄数定义为4个，分别为：服务句柄、特征句柄，特征值句柄，特征值描述句柄
 
 #define GATTS_SERVICE_UUID_TEST_B   0x00EE
 #define GATTS_CHAR_UUID_TEST_B      0xEE01
 #define GATTS_DESCR_UUID_TEST_B     0x2222
 #define GATTS_NUM_HANDLE_TEST_B     4
 
-#define TEST_DEVICE_NAME            "ESP_GATTS_DEMO"
+#define TEST_DEVICE_NAME            "ESP_GATTS_DEMO"//蓝牙名称
 #define TEST_MANUFACTURER_DATA_LEN  17
 
 #define GATTS_DEMO_CHAR_VAL_LEN_MAX 0x40
@@ -67,7 +76,8 @@ static esp_attr_value_t gatts_demo_char1_val =
     .attr_len     = sizeof(char1_str),
     .attr_value   = char1_str,
 };
-
+uint8_t wendu = 0;
+uint8_t sidu = 0;
 static uint8_t adv_config_done = 0;
 #define adv_config_flag      (1 << 0)
 #define scan_rsp_config_flag (1 << 1)
@@ -142,22 +152,22 @@ static esp_ble_adv_params_t adv_params = {
 #define PROFILE_NUM 2
 #define PROFILE_A_APP_ID 0
 #define PROFILE_B_APP_ID 1
-//profile结构体定义，每个profile有一个句柄
+//profile结构体定义，每个profile(规范))有一个句柄
 struct gatts_profile_inst {
-    esp_gatts_cb_t gatts_cb;
-    uint16_t gatts_if;
-    uint16_t app_id;
-    uint16_t conn_id;
-    uint16_t service_handle;
-    esp_gatt_srvc_id_t service_id;
-    uint16_t char_handle;
-    esp_bt_uuid_t char_uuid;
-    esp_gatt_perm_t perm;
-    esp_gatt_char_prop_t property;
-    uint16_t descr_handle;
-    esp_bt_uuid_t descr_uuid;
+    esp_gatts_cb_t gatts_cb;//GATT的回调函数
+    uint16_t gatts_if;//GATT的接口
+    uint16_t app_id;//应用的ID
+    uint16_t conn_id;//连接的ID
+    uint16_t service_handle;//服务service句柄
+    esp_gatt_srvc_id_t service_id;//服务service ID
+    uint16_t char_handle;//特征Characteristic句柄
+    esp_bt_uuid_t char_uuid;//特征Characteristic的UUid
+    esp_gatt_perm_t perm;//特征属性attribute授权
+    esp_gatt_char_prop_t property;//特征Characteristic的特性
+    uint16_t descr_handle;//描述descriptor句柄
+    esp_bt_uuid_t descr_uuid;//描述descriptor UUID
 };
-
+//两个profile在这里定义
 /* One gatt-based profile one app_id and one gatts_if, （一个gatt-based的profile,由一个app_id和一个gatts_if组成）
 this array will store the gatts_if returned by ESP_GATTS_REG_EVT （此数组将存储ESP_gatts_REG_EVT返回的gatts_if）*/
 static struct gatts_profile_inst gl_profile_tab[PROFILE_NUM] = {
@@ -181,7 +191,9 @@ static prepare_type_env_t b_prepare_write_env;
 
 void example_write_event_env(esp_gatt_if_t gatts_if, prepare_type_env_t *prepare_write_env, esp_ble_gatts_cb_param_t *param);
 void example_exec_write_event_env(prepare_type_env_t *prepare_write_env, esp_ble_gatts_cb_param_t *param);
-
+/// @brief gap_event_handler函数的作用：用于将生成的接口存储在配置文件中，然后将时间转发到相应的配置文件时间处理程序
+/// @param event 
+/// @param param 
 static void gap_event_handler(esp_gap_ble_cb_event_t event, esp_ble_gap_cb_param_t *param)
 {
     switch (event) {
@@ -199,33 +211,33 @@ static void gap_event_handler(esp_gap_ble_cb_event_t event, esp_ble_gap_cb_param
         }
         break;
 #else
-    case ESP_GAP_BLE_ADV_DATA_SET_COMPLETE_EVT:
+    case ESP_GAP_BLE_ADV_DATA_SET_COMPLETE_EVT://广播数据设置完成标志
         adv_config_done &= (~adv_config_flag);
         if (adv_config_done == 0){
-            esp_ble_gap_start_advertising(&adv_params);
+            esp_ble_gap_start_advertising(&adv_params);//开始广播
         }
         break;
-    case ESP_GAP_BLE_SCAN_RSP_DATA_SET_COMPLETE_EVT:
+    case ESP_GAP_BLE_SCAN_RSP_DATA_SET_COMPLETE_EVT://广播扫描相应设置完成标志
         adv_config_done &= (~scan_rsp_config_flag);
         if (adv_config_done == 0){
             esp_ble_gap_start_advertising(&adv_params);
         }
         break;
 #endif
-    case ESP_GAP_BLE_ADV_START_COMPLETE_EVT:
+    case ESP_GAP_BLE_ADV_START_COMPLETE_EVT://开始广播事件标志
         //advertising start complete event to indicate advertising start successfully or failed
         if (param->adv_start_cmpl.status != ESP_BT_STATUS_SUCCESS) {
             ESP_LOGE(GATTS_TAG, "Advertising start failed\n");
         }
         break;
-    case ESP_GAP_BLE_ADV_STOP_COMPLETE_EVT:
+    case ESP_GAP_BLE_ADV_STOP_COMPLETE_EVT://停止广播事件标志
         if (param->adv_stop_cmpl.status != ESP_BT_STATUS_SUCCESS) {
             ESP_LOGE(GATTS_TAG, "Advertising stop failed\n");
         } else {
             ESP_LOGI(GATTS_TAG, "Stop adv successfully\n");
         }
         break;
-    case ESP_GAP_BLE_UPDATE_CONN_PARAMS_EVT:
+    case ESP_GAP_BLE_UPDATE_CONN_PARAMS_EVT://设备连接事件，可获取当前连接的设备信息
          ESP_LOGI(GATTS_TAG, "update connection params status = %d, min_int = %d, max_int = %d,conn_int = %d,latency = %d, timeout = %d",
                   param->update_conn_params.status,
                   param->update_conn_params.min_int,
@@ -295,9 +307,15 @@ void example_exec_write_event_env(prepare_type_env_t *prepare_write_env, esp_ble
     }
     prepare_write_env->prepare_len = 0;
 }
+/*
 
+****************/
 static void gatts_profile_a_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_if, esp_ble_gatts_cb_param_t *param) {
     switch (event) {
+    /*
+    展示了一个Service的创建
+    GATT注册事件，添加 service的基本信息，设置BLE名称
+    */
     case ESP_GATTS_REG_EVT:
         ESP_LOGI(GATTS_TAG, "REGISTER_APP_EVT, status %d, app_id %d\n", param->reg.status, param->reg.app_id);
         gl_profile_tab[PROFILE_A_APP_ID].service_id.is_primary = true;
@@ -335,27 +353,42 @@ static void gatts_profile_a_event_handler(esp_gatts_cb_event_t event, esp_gatt_i
         adv_config_done |= scan_rsp_config_flag;
 
 #endif
+    //最后调用esp_ble_gatts_create_service()指定 gatts_if 和 service_id 来创建服务<实际调用 btc_transfer_context() 来完成服务的创建和调用回调函数>
+    //参数
+    //gatts_if – [in] GATT server access interface
+    //service_id – [in] service ID. 服务ID
+   //num_handle – [in] number of handle requested for this service.  这个服务所要用到的句柄数量
         esp_ble_gatts_create_service(gatts_if, &gl_profile_tab[PROFILE_A_APP_ID].service_id, GATTS_NUM_HANDLE_TEST_A);
         break;
+        //GATT读取事件，手机读取开发板的数据
     case ESP_GATTS_READ_EVT: {
-        ESP_LOGI(GATTS_TAG, "GATT_READ_EVT, conn_id %d, trans_id %d, handle %d\n,温度：%d,湿度：%d", param->read.conn_id, param->read.trans_id, param->read.handle,DHT11_read().temperature,DHT11_read().humidity);
-        esp_gatt_rsp_t rsp;
-        memset(&rsp, 0, sizeof(esp_gatt_rsp_t));
+        ESP_LOGI(GATTS_TAG, "GATT_READ_EVT, conn_id %d, trans_id %d, handle %d\n,温度：%d,湿度：%d", param->read.conn_id, param->read.trans_id, param->read.handle,DHT11_read().temperature,DHT11_read().humidity);/*wendu,sidu*/
+       esp_gatt_rsp_t rsp;
+        memset(&rsp, 0, sizeof(esp_gatt_rsp_t));//memset用来对一段内存空间全部设置为某个字符，一般用在对定义的字符串进行初始化为‘ ’或‘/0’
         rsp.attr_value.handle = param->read.handle;
         rsp.attr_value.len = 4;
-        rsp.attr_value.value[0] = 0xde;//DHT11_read().temperature;
+        rsp.attr_value.value[0] = DHT11_read().temperature;//;0xde
         rsp.attr_value.value[1] = 0xed;
         rsp.attr_value.value[2] = 0xbe;
         rsp.attr_value.value[3] = 0xef;
         esp_ble_gatts_send_response(gatts_if, param->read.conn_id, param->read.trans_id,
                                     ESP_GATT_OK, &rsp);
+        /* if ( gl_profile_tab[PROFILE_A_APP_ID].char_handle == param->read.handle)
+        {
+
+            uint8_t wendu_test[1] = {0};
+            wendu_test[0] = DHT11_read().temperature;
+            esp_ble_gatts_set_attr_value(param->read.handle,sizeof(wendu_test),(uint8_t*)wendu_test);
+        }*/
+        
         break;
     }
+     //GATT写事件，手机给开发板的发送数据.  不需要回复存疑??
     case ESP_GATTS_WRITE_EVT: {
         ESP_LOGI(GATTS_TAG, "GATT_WRITE_EVT, conn_id %d, trans_id %d, handle %d", param->write.conn_id, param->write.trans_id, param->write.handle);
         if (!param->write.is_prep){
             ESP_LOGI(GATTS_TAG, "GATT_WRITE_EVT, value len %d, value :", param->write.len);
-            esp_log_buffer_hex(GATTS_TAG, param->write.value, param->write.len);
+            esp_log_buffer_hex(GATTS_TAG, param->write.value, param->write.len);//在信息级别记录一个十六进制字节的缓冲区。
             if (gl_profile_tab[PROFILE_A_APP_ID].descr_handle == param->write.handle && param->write.len == 2){
                 uint16_t descr_value = param->write.value[1]<<8 | param->write.value[0];
                 if (descr_value == 0x0001){
@@ -395,7 +428,7 @@ static void gatts_profile_a_event_handler(esp_gatts_cb_event_t event, esp_gatt_i
         example_write_event_env(gatts_if, &a_prepare_write_env, param);
         break;
     }
-    case ESP_GATTS_EXEC_WRITE_EVT:
+    case ESP_GATTS_EXEC_WRITE_EVT://GATT写事件，手机给开发板的发送数据，需要回复
         ESP_LOGI(GATTS_TAG,"ESP_GATTS_EXEC_WRITE_EVT");
         esp_ble_gatts_send_response(gatts_if, param->write.conn_id, param->write.trans_id, ESP_GATT_OK, NULL);
         example_exec_write_event_env(&a_prepare_write_env, param);
@@ -405,12 +438,20 @@ static void gatts_profile_a_event_handler(esp_gatts_cb_event_t event, esp_gatt_i
         break;
     case ESP_GATTS_UNREG_EVT:
         break;
-    case ESP_GATTS_CREATE_EVT:
+    case ESP_GATTS_CREATE_EVT://创建 GATT事件,基本参数的设置，将Characteristic加到service中，完成触发下面事件
         ESP_LOGI(GATTS_TAG, "CREATE_SERVICE_EVT, status %d,  service_handle %d\n", param->create.status, param->create.service_handle);
         gl_profile_tab[PROFILE_A_APP_ID].service_handle = param->create.service_handle;
         gl_profile_tab[PROFILE_A_APP_ID].char_uuid.len = ESP_UUID_LEN_16;
         gl_profile_tab[PROFILE_A_APP_ID].char_uuid.uuid.uuid16 = GATTS_CHAR_UUID_TEST_A;
-
+      /***
+       * 在ESP_GATTS_CREATE_EVT事件中调用了函数：esp_err_t esp_ble_gatts_start_service(uint16_t service_handle)
+        该函数的作用是启动 GATT 服务。再然后调用函数：
+        esp_err_t esp_ble_gatts_add_char(uint16_t service_handle,  esp_bt_uuid_t  *char_uuid,
+                                 esp_gatt_perm_t perm, esp_gatt_char_prop_t property, esp_attr_value_t *char_val,
+                                 esp_attr_control_t *control)来添加特性(特征的UUID， 特征值描述符属性权限， 特征属性、特征值、属性响应控制字节)。
+        上面的一系列操作会触发ESP_GATTS_START_EVT和ESP_GATTS_ADD_CHAR_EVT事件
+       * 
+       * ********/
         esp_ble_gatts_start_service(gl_profile_tab[PROFILE_A_APP_ID].service_handle);
         a_property = ESP_GATT_CHAR_PROP_BIT_READ | ESP_GATT_CHAR_PROP_BIT_WRITE | ESP_GATT_CHAR_PROP_BIT_NOTIFY;
         esp_err_t add_char_ret = esp_ble_gatts_add_char(gl_profile_tab[PROFILE_A_APP_ID].service_handle, &gl_profile_tab[PROFILE_A_APP_ID].char_uuid,
@@ -423,6 +464,7 @@ static void gatts_profile_a_event_handler(esp_gatts_cb_event_t event, esp_gatt_i
         break;
     case ESP_GATTS_ADD_INCL_SRVC_EVT:
         break;
+         //添加Characteristic事件，添加Characteristic的Descriptor，完成触发下面事件
     case ESP_GATTS_ADD_CHAR_EVT: {
         uint16_t length = 0;
         const uint8_t *prf_char;
@@ -448,7 +490,7 @@ static void gatts_profile_a_event_handler(esp_gatts_cb_event_t event, esp_gatt_i
         }
         break;
     }
-    case ESP_GATTS_ADD_CHAR_DESCR_EVT:
+    case ESP_GATTS_ADD_CHAR_DESCR_EVT:// 添加描述事件
         gl_profile_tab[PROFILE_A_APP_ID].descr_handle = param->add_char_descr.attr_handle;
         ESP_LOGI(GATTS_TAG, "ADD_DESCR_EVT, status %d, attr_handle %d, service_handle %d\n",
                  param->add_char_descr.status, param->add_char_descr.attr_handle, param->add_char_descr.service_handle);
@@ -461,7 +503,7 @@ static void gatts_profile_a_event_handler(esp_gatts_cb_event_t event, esp_gatt_i
         break;
     case ESP_GATTS_STOP_EVT:
         break;
-    case ESP_GATTS_CONNECT_EVT: {
+    case ESP_GATTS_CONNECT_EVT: {// GATT 连接事件
         esp_ble_conn_update_params_t conn_params = {0};
         memcpy(conn_params.bda, param->connect.remote_bda, sizeof(esp_bd_addr_t));
         /* For the IOS system, please reference the apple official documents about the ble connection parameters restrictions. */
@@ -477,12 +519,12 @@ static void gatts_profile_a_event_handler(esp_gatts_cb_event_t event, esp_gatt_i
         //start sent the update connection parameters to the peer device.
         esp_ble_gap_update_conn_params(&conn_params);
         break;
-    }
-    case ESP_GATTS_DISCONNECT_EVT:
+    } 
+    case ESP_GATTS_DISCONNECT_EVT://断开连接事件
         ESP_LOGI(GATTS_TAG, "ESP_GATTS_DISCONNECT_EVT, disconnect reason 0x%x", param->disconnect.reason);
         esp_ble_gap_start_advertising(&adv_params);
         break;
-    case ESP_GATTS_CONF_EVT:
+    case ESP_GATTS_CONF_EVT: //GATT配置事件
         ESP_LOGI(GATTS_TAG, "ESP_GATTS_CONF_EVT, status %d attr_handle %d", param->conf.status, param->conf.handle);
         if (param->conf.status != ESP_GATT_OK){
             esp_log_buffer_hex(GATTS_TAG, param->conf.value, param->conf.len);
@@ -641,11 +683,21 @@ static void gatts_profile_b_event_handler(esp_gatts_cb_event_t event, esp_gatt_i
         break;
     }
 }
+/***+********************/
 
+/// @brief 函数的作用导入GATT的profiles,本例有两个profile，profile的定义在,每个profile对应回调函数分别是gatts_profile_a_event_handler，gatts_profile_b_event_handler
+/// @param event 
+/// @param gatts_if 
+/// @param param 
 static void gatts_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_if, esp_ble_gatts_cb_param_t *param)
 {
-    /* If event is register event, store the gatts_if for each profile */
+    /* If event is register event, store the gatts_if for each profile 
+    判断是否是GATT的注册事件
+    */
     if (event == ESP_GATTS_REG_EVT) {
+
+   /* 确定底层GATT运行成功
+    *触发ESP_GATTS_REG_EVT时，完成对每个profile 的gatts_if 的注册  */
         if (param->reg.status == ESP_GATT_OK) {
             gl_profile_tab[param->reg.app_id].gatts_if = gatts_if;
         } else {
@@ -657,7 +709,8 @@ static void gatts_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_
     }
 
     /* If the gatts_if equal to profile A, call profile A cb handler,
-     * so here call each profile's callback */
+     * so here call each profile's callback    
+     如果gatts_if == 某个Profile的gatts_if时，调用对应profile的回调函数处理事情。*/
     do {
         int idx;
         for (idx = 0; idx < PROFILE_NUM; idx++) {
@@ -682,6 +735,7 @@ static void gatts_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_
 
 void app_main()
 {
+   
    /**dht11部分**/
      DHT11_init(GPIO_NUM_8);
 
@@ -690,7 +744,7 @@ void app_main()
         ESP_LOGI(TAG,"Humidity is %d\n", DHT11_read().humidity);
         ESP_LOGI(TAG,"Status code is %d\n", DHT11_read().status);
         vTaskDelay(3000/portTICK_PERIOD_MS);
-   
+ 
 
     /**蓝牙部分**************************************************/
    esp_err_t ret;  //   定义出处 typedef int32_t esp_err_t; 
